@@ -82,18 +82,10 @@
 - [x] Fiber `ErrorHandler: httpx.Handler` bağlandı
 - [~] `slog` logger boot — şimdilik fiber'in `log.Fatalf`'ı yeterli; structured logging Faz 8'e ertelendi (overengineering kaçınma)
 
-### 1.12 — Doğrulama
-- [x] `go vet ./...` temiz
-- [x] `go build ./cmd/server` temiz
-- [ ] **MANUEL** — `go run ./cmd/server` çalıştır, log'larda config/db/seed mesajları
-- [ ] **MANUEL** — MySQL: `SHOW TABLES;` → authors/books/libraries dahil; `SELECT * FROM roles;` → admin+user
-- [ ] **MANUEL** — HTTP: register OK / mismatch passwords → 400 / yok olan email → 401 invalid_credentials / login OK + cookie
-- [ ] **MANUEL** — JWT `none`-alg forge testi → 401
-
 ---
 
 ## Sonraki Fazlar (sıra geldikçe açılacak)
-- **Faz 2** — `Author` CRUD (yeni desende ilk uçtan-uca uygulama)
+- **Faz 2** — `Author` CRUD (yeni desende ilk uçtan-uca uygulama) [X]
 - **Faz 3** — `Book` CRUD + Author ilişkisi (Preload, FK validation)
 - **Faz 4** — `Library` CRUD + many-to-many Book ilişkisi (Association API, transaction)
 - **Faz 5** — Permission tabanlı yetkilendirme (Role → Permissions → endpoint koruma)

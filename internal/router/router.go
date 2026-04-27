@@ -14,6 +14,7 @@ import (
 // router.Setup() arasındaki sözleşme tek noktada görünür.
 type Deps struct {
 	Auth     *handler.AuthHandler
+	Author   *handler.AuthorHandler
 	DB       *gorm.DB
 	TokenMgr *token.Manager
 }
@@ -28,7 +29,14 @@ func Setup(app *fiber.App, deps Deps) {
 	public.Post("/login", deps.Auth.Login)
 	public.Post("/logout", deps.Auth.Logout)
 
-	// PROTECTED — Auth middleware'inden geçer; sonraki handler'lar c.Locals'tan
+	// PROTECTED — Auth middleware'inden geçer.
+	protected := app.Group("/api", middleware.Auth(deps.DB, deps.TokenMgr))
+	protected.Get("/authors", deps.Author.List)
+	protected.Get("/authors/:id", deps.Author.Get)
+	protected.Post("/authors", deps.Author.Create)
+	protected.Put("/authors/:id", deps.Author.Update)
+	protected.Delete("/authors/:id", deps.Author.Delete)
+
 	// userID ve roleID okuyabilir. Şu an boş; Faz 2+ ile dolacak.
-	_ = app.Group("/api", middleware.Auth(deps.DB, deps.TokenMgr))
+	app.Group("/api", middleware.Auth(deps.DB, deps.TokenMgr))
 }

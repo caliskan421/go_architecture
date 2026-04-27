@@ -18,7 +18,8 @@ import (
 // İş mantığı bu dosyada YOK — sadece kurulum sırası vardır.
 //
 // Sıra (her biri öncekine bağımlı):
-//   config -> db open -> migrate -> seed -> token mgr -> validator -> handler -> fiber + cors -> router -> listen
+//
+//	config -> db open -> migrate -> seed -> token mgr -> validator -> handler -> fiber + cors -> router -> listen
 func main() {
 	// 1) Konfigürasyonu yükle. Zorunlu env eksikse Load() içinde log.Fatalf.
 	cfg := config.Load()
@@ -50,6 +51,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("auth handler init: %v", err)
 	}
+	authorHandler := handler.NewAuthorHandler(db, val)
 
 	// 8) Fiber app — central error handler bağlandı; artık handler'lar `return apperror`
 	//    diyebilir, JSON zarflama tek noktadan.
@@ -68,6 +70,7 @@ func main() {
 	// 10) Router — tüm endpoint'ler tek yerden bağlanır.
 	router.Setup(app, router.Deps{
 		Auth:     authHandler,
+		Author:   authorHandler,
 		DB:       db,
 		TokenMgr: tokenMgr,
 	})

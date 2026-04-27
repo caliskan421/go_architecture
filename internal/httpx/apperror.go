@@ -89,6 +89,10 @@ var (
 		Code: "not_found", HTTPStatus: http.StatusNotFound,
 		Message: "kayıt bulunamadı",
 	}
+	ErrConflict = &AppError{
+		Code: "conflict", HTTPStatus: http.StatusConflict,
+		Message: "Kaynak mevcut bir kayıtla çakışıyor.",
+	}
 	ErrInternal = &AppError{
 		Code: "internal_error", HTTPStatus: http.StatusInternalServerError,
 		Message: "iç sunucu hatası",

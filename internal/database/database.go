@@ -14,7 +14,10 @@ import (
 // Open, GORM ile MySQL bağlantısını açar. DSN cfg.DBDSn'den okunur.
 // Hata dönerse caller (main) log.Fatalf ile yakalar.
 func Open(cfg *config.Config) (*gorm.DB, error) {
-	db, err := gorm.Open(mysql.Open(cfg.DBDSn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(cfg.DBDSn), &gorm.Config{
+		// Bu olmadan errors.Is(err, gorm.ErrDuplicatedKey) her zaman false döner → 409 yerine 500 dönerdik.
+		TranslateError: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("gorm.Open: %w", err)
 	}
