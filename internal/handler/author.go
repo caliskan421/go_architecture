@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"libra_management/internal/dto"
 	"libra_management/internal/httpx"
@@ -43,22 +44,44 @@ func NewAuthorHandler(db *gorm.DB, val *validator.Validate) *AuthorHandler {
 	}
 }
 
-// List, tüm author'ları döner.
+// authorSortFields, sort=... query'sinde kabul edilecek kolon whitelist'i.
+// Whitelist dışında bir değer gelirse ParseSort default'a düşer.
+var authorSortFields = []string{"id", "name", "created_at", "updated_at"}
+
+// List, author'ları sayfalı döner. ?q= ile name LIKE araması, ?sort=&order=
+// ile sıralama, ?page=&page_size= ile sayfalama kabul eder.
 //
-//	GET /api/authors  ->  200 {"data": []dto.AuthorResponse}
-//
-// Faz 6'da generic Page[T] ile sayfalanacak; "tümünü dön" şimdilik geçici.
+//	GET /api/authors?page=1&page_size=20&sort=name&order=asc&q=yaşar
+//	-> 200 {"data": httpx.Page[dto.AuthorResponse]}
 func (h *AuthorHandler) List(c fiber.Ctx) error {
-	var authors []model.Author
-	if err := h.db.Find(&authors).Error; err != nil {
+	pg := httpx.ParsePagination(c)
+	sort := httpx.ParseSort(c, authorSortFields, "id")
+	q := strings.TrimSpace(c.Query("q"))
+
+	// Tek query builder'ı önce filter+count, sonra paginate+find için yeniden kullanıyoruz.
+	// Session(&gorm.Session{}) "fresh statement" oluşturur ki Count ve Find aynı condition'ları
+	// alsın ama LIMIT/OFFSET birbirine sızmasın.
+	tx := h.db.Model(&model.Author{})
+	if q != "" {
+		tx = tx.Where("name LIKE ?", "%"+q+"%")
+	}
+
+	var total int64
+	if err := tx.Count(&total).Error; err != nil {
 		return httpx.ErrInternal.WithErr(err)
 	}
-	// make+len: boş slice "null" yerine "[]" olarak JSON'a düşsün.
-	out := make([]dto.AuthorResponse, len(authors))
-	for i, a := range authors {
-		out[i] = dto.ToAuthorResponse(a)
+
+	var authors []model.Author
+	err := tx.Order(sort.OrderClause()).Limit(pg.Limit()).Offset(pg.Offset()).Find(&authors).Error
+	if err != nil {
+		return httpx.ErrInternal.WithErr(err)
 	}
-	return httpx.Success(c, fiber.StatusOK, out)
+
+	items := make([]dto.AuthorResponse, len(authors))
+	for i, a := range authors {
+		items[i] = dto.ToAuthorResponse(a)
+	}
+	return httpx.Success(c, fiber.StatusOK, httpx.NewPage(items, total, pg))
 }
 
 // Get, ID'ye göre tek author döner.

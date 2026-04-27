@@ -1,10 +1,14 @@
 package main
 
 import (
+	"log/slog"
+	"os"
+
 	"libra_management/internal/config"
 	"libra_management/internal/database"
 	"libra_management/internal/handler"
 	"libra_management/internal/httpx"
+	"libra_management/internal/middleware"
 	"libra_management/internal/router"
 	"libra_management/pkg/token"
 	"libra_management/pkg/validate"
@@ -19,62 +23,78 @@ import (
 //
 // Sıra (her biri öncekine bağımlı):
 //
-//	config -> db open -> migrate -> seed -> token mgr -> validator -> handler -> fiber + cors -> router -> listen
+//	slog -> config -> db open -> migrate -> seed -> token mgr -> validator
+//	  -> handler -> authorizer -> fiber + cors + request-id -> router -> listen
 func main() {
-	// 1) Konfigürasyonu yükle. Zorunlu env eksikse Load() içinde log.Fatalf.
+	// 1) Structured logging (Faz 8). Üretimde JSON, dev'de text de yapılabilir;
+	//    burada JSON tercih ettik: log toplayıcılar (Loki/Datadog) parse edebilsin.
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+
+	// 2) Konfigürasyonu yükle. Zorunlu env eksikse Load() içinde log.Fatalf.
 	cfg := config.Load()
 
-	// 2) DB bağlantısı.
+	// 3) DB bağlantısı.
 	db, err := database.Open(cfg)
 	if err != nil {
 		log.Fatalf("db open: %v", err)
 	}
 
-	// 3) Şema migration — tüm modeller.
+	// 4) Şema migration — tüm modeller.
 	if err := database.Migrate(db); err != nil {
 		log.Fatalf("db migrate: %v", err)
 	}
 
-	// 4) Default kayıtları seed et (admin & user rolleri).
+	// 5) Default kayıtları seed et (admin & user rolleri + permissions).
 	if err := database.Seed(db); err != nil {
 		log.Fatalf("db seed: %v", err)
 	}
 
-	// 5) Token manager (JWT).
+	// 6) Token manager (JWT).
 	tokenMgr := token.New(cfg.JWTSecret, cfg.JWTTTL)
 
-	// 6) Validator (paylaşılan instance — tag cache).
+	// 7) Validator (paylaşılan instance — tag cache).
 	val := validate.New()
 
-	// 7) Handler instance'ı. ctor default role'ü DB'den çeker, dummy hash üretir.
+	// 8) Handler instance'ları.
 	authHandler, err := handler.NewAuthHandler(db, cfg, tokenMgr, val)
 	if err != nil {
 		log.Fatalf("auth handler init: %v", err)
 	}
 	authorHandler := handler.NewAuthorHandler(db, val)
+	bookHandler := handler.NewBookHandler(db, val)
+	libraryHandler := handler.NewLibraryHandler(db, val)
 
-	// 8) Fiber app — central error handler bağlandı; artık handler'lar `return apperror`
-	//    diyebilir, JSON zarflama tek noktadan.
+	// 9) Authorizer: rol-izin çözümlemesini cache'leyen RBAC servisi.
+	authorizer := middleware.NewAuthorizer(db)
+
+	// 10) Fiber app — central error handler bağlandı.
 	app := fiber.New(fiber.Config{
 		ErrorHandler: httpx.Handler,
 	})
 
-	// 9) CORS — wildcard "*" yerine cfg'den whitelist.
-	//    AllowCredentials true: cookie tabanlı auth için zorunlu (browser cross-origin
-	//    cookie göndersin diye).
+	// 11) Global middleware'ler — sıra ÖNEMLİ:
+	//   a) Request-ID önce: log'da her request bir id'yle eşleşsin.
+	//   b) CORS sonra: 401/403 dönen requestler de CORS header alsın.
+	app.Use(middleware.RequestID())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
 		AllowCredentials: true,
 	}))
 
-	// 10) Router — tüm endpoint'ler tek yerden bağlanır.
+	// 12) Router — tüm endpoint'ler tek yerden bağlanır.
 	router.Setup(app, router.Deps{
-		Auth:     authHandler,
-		Author:   authorHandler,
-		DB:       db,
-		TokenMgr: tokenMgr,
+		Auth:       authHandler,
+		Author:     authorHandler,
+		Book:       bookHandler,
+		Library:    libraryHandler,
+		DB:         db,
+		TokenMgr:   tokenMgr,
+		Authorizer: authorizer,
 	})
 
-	// 11) Listen.
+	// 13) Listen.
+	slog.Info("server starting", "port", cfg.Port)
 	log.Fatal(app.Listen(cfg.Port))
 }

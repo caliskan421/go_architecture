@@ -91,9 +91,14 @@ func (h *AuthHandler) Register(c fiber.Ctx) error {
 		// Migration sırası değişse bile "user" rolü = doğru ID — privilege-escalation engellendi.
 		RoleID: h.defaultRoleID,
 	}
-	if err := h.db.Create(&user).Error; err != nil {
-		// DB'nin ham hatası (örn. "Duplicate entry 'x' for key 'email'") DOĞRUDAN sızdırılmaz —
-		// generic 500 dönüyoruz. Caller log'tan detayı görür.
+	err = h.db.Create(&user).Error
+	switch {
+	// Email uniqueIndex çakışması → 409. TranslateError:true sayesinde gorm.ErrDuplicatedKey'a çevrilir.
+	// Mesaj generic: "kayıt mevcut" — saldırgan email enumeration yapamasın diye field detail vermiyoruz.
+	case errors.Is(err, gorm.ErrDuplicatedKey):
+		return httpx.ErrConflict
+	case err != nil:
+		// Ham DB hatası DOĞRUDAN sızdırılmaz; generic 500. Caller log'tan görür.
 		return httpx.ErrInternal.WithErr(err)
 	}
 
@@ -143,9 +148,9 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
 		Name:     "jwt",
 		Value:    jwtToken,
-		HTTPOnly: true,                // JS'den okunamaz — XSS guard
-		Secure:   h.cfg.CookieSecure,  // sadece HTTPS — production'da true
-		SameSite: "Lax",               // CSRF guard (cross-site POST'larda gönderilmez)
+		HTTPOnly: true,               // JS'den okunamaz — XSS guard
+		Secure:   h.cfg.CookieSecure, // sadece HTTPS — production'da true
+		SameSite: "Lax",              // CSRF guard (cross-site POST'larda gönderilmez)
 		Expires:  time.Now().Add(h.cfg.JWTTTL),
 	})
 
