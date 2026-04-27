@@ -1,0 +1,15 @@
+  Request
+    ↓
+  Fiber app (ErrorHandler: httpx.Handler)
+    ↓
+  CORS (cfg.AllowedOrigins)
+    ↓
+  Router.Setup → public group | protected group (middleware.Auth(db, tokenMgr))
+    ↓
+  Handler method (h.Register / h.Login / h.Logout)
+    ↓ on success
+  httpx.Success(c, status, dto.UserResponse) → {"data": ...}
+    ↓ on error
+  return httpx.ErrXxx → Fiber → httpx.Handler → {"error": {...}}
+
+  Hiçbir paket os.Getenv çağırmıyor (sadece internal/config). Hiçbir paket database.DB global'ine bakmıyor. Hiçbir handler fiber.Map{"error": ...} inline yazmıyor.
