@@ -34,8 +34,8 @@ type AuthHandler struct {
 }
 
 // NewAuthHandler, boot'ta bir kez çağrılır.
-// Default role DB'de yoksa hata döner (Seed çalışmamış olabilir) — main.go bunu
-// log.Fatalf ile yakalar; uygulama yanlış konfigle çalışmaya devam etmez.
+// Default role DB'de yoksa hata döner (Seed çalışmamış olabilir)
+// main.go bunu log.Fatalf ile yakalar; uygulama yanlış konfigle çalışmaya devam etmez.
 func NewAuthHandler(db *gorm.DB, cfg *config.Config, tokens *token.Manager, val *validator.Validate) (*AuthHandler, error) {
 	// 1) Default role'ün ID'sini boot'ta bir kez çek — her register'da DB'ye gitmemek için.
 	var role model.Role

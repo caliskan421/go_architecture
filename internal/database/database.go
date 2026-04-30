@@ -42,7 +42,7 @@ func Migrate(db *gorm.DB) error {
 // Sıra ÖNEMLİ:
 //  1. Permissions  — atomic izin satırları
 //  2. Roles        — admin/user
-//  3. Role↔Permission bağı — admin'e tümü, user'a okuma izinleri
+//  3. Role ↔ Permission bağı — admin'e tümü, user'a okuma izinleri
 //
 // Idempotent: tekrar çalıştırıldığında çift kayıt oluşturmaz, ama her boot'ta
 // rol-izin ilişkisini yeniden senkronize eder (kod listesi DB'ye yansır).

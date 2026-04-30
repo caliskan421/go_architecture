@@ -31,8 +31,7 @@ func NewBookHandler(db *gorm.DB, val *validator.Validate) *BookHandler {
 // büyük tablolarda count tarama yapar, biz sadece varlık bilgisi istiyoruz.
 func (h *BookHandler) authorExists(id uint) (bool, error) {
 	var got uint
-	err := h.db.Model(&model.Author{}).
-		Select("id").Where("id = ?", id).Limit(1).Scan(&got).Error
+	err := h.db.Model(&model.Author{}).Select("id").Where("id = ?", id).Limit(1).Scan(&got).Error
 	if err != nil {
 		return false, err
 	}
@@ -70,9 +69,7 @@ func (h *BookHandler) List(c fiber.Ctx) error {
 	}
 
 	var books []model.Book
-	err := tx.Preload("Author").
-		Order(sort.OrderClause()).Limit(pg.Limit()).Offset(pg.Offset()).
-		Find(&books).Error
+	err := tx.Preload("Author").Order(sort.OrderClause()).Limit(pg.Limit()).Offset(pg.Offset()).Find(&books).Error
 	if err != nil {
 		return httpx.ErrInternal.WithErr(err)
 	}

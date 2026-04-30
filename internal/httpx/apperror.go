@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-// AppError, uygulamanın iç hata tipidir. Bir hatanın *anlamını* (Code), client'a
+// AppError, uygulamanın iç hata tipidir. Bir hatanın anlamını (Code), client'a
 // gösterilecek mesajı (Message), HTTP karşılığını (HTTPStatus), opsiyonel detayı
 // (Details — örn. validation alan listesi) ve sarmalanan iç hatayı (Err — log için)
 // tek yerde toplar.

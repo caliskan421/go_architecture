@@ -26,32 +26,25 @@ import (
 //	slog -> config -> db open -> migrate -> seed -> token mgr -> validator
 //	  -> handler -> authorizer -> fiber + cors + request-id -> router -> listen
 func main() {
-	// 1) Structured logging (Faz 8). Üretimde JSON, dev'de text de yapılabilir;
-	//    burada JSON tercih ettik: log toplayıcılar (Loki/Datadog) parse edebilsin.
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	})))
 
-	// 2) Konfigürasyonu yükle. Zorunlu env eksikse Load() içinde log.Fatalf.
 	cfg := config.Load()
 
-	// 3) DB bağlantısı.
 	db, err := database.Open(cfg)
 	if err != nil {
 		log.Fatalf("db open: %v", err)
 	}
 
-	// 4) Şema migration — tüm modeller.
 	if err := database.Migrate(db); err != nil {
 		log.Fatalf("db migrate: %v", err)
 	}
 
-	// 5) Default kayıtları seed et (admin & user rolleri + permissions).
 	if err := database.Seed(db); err != nil {
 		log.Fatalf("db seed: %v", err)
 	}
 
-	// 6) Token manager (JWT).
 	tokenMgr := token.New(cfg.JWTSecret, cfg.JWTTTL)
 
 	// 7) Validator (paylaşılan instance — tag cache).
